@@ -5,7 +5,6 @@ import os
 app = Flask(__name__)
 
 # ======================================
-# ✅ 配置你的密钥
 OPENAI_API_KEY = "fk244398-QSw83MwkSHVOg8Sn1wyZBWHmBMA5EjMx"
 OPENAI_BASE_URL = "https://openai.api2d.net/v1"
 # ======================================
@@ -36,17 +35,15 @@ FRONTEND = """
         input,select{flex:1;padding:12px 20px;border:2px solid #e5e5e5;border-radius:25px;font-size:15px;outline:none}
         button{padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:25px;font-size:15px;font-weight:600;cursor:pointer}
         button:hover{transform:translateY(-2px)}
-        button:disabled{opacity:0.5}
-        .image-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px;margin-top:20px}
+        .image-grid{display:grid;grid-template-columns:1fr;gap:15px;margin-top:20px}
         .card{border-radius:10px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.1)}
         .card img{width:100%;display:block}
         .loading{text-align:center;padding:40px;color:#666}
-        .tip{background:#fff3cd;padding:15px;border-radius:10px;margin:15px 0}
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header"><h1>🚀 AI 全能助手</h1><p style="opacity:0.9;margin-top:5px">聊天对话 | AI画图</p></div>
+        <div class="header"><h1>🚀 AI 全能助手</h1></div>
         
         <div class="tabs">
             <button class="tab active" onclick="tab('chat')">💬 聊天</button>
@@ -54,17 +51,17 @@ FRONTEND = """
         </div>
         
         <div id="chat" class="tab-content active">
-            <div class="chat-box" id="chatBox"><div class="msg ai">你好！我是AI助手，有什么可以帮助你的？</div></div>
-            <div class="input-row"><input id="chatInput" placeholder="输入你的问题..." onkeypress="if(event.key=='Enter')sendChat()"><button onclick="sendChat()">发送</button></div>
+            <div class="chat-box" id="chatBox"><div class="msg ai">你好！我是AI助手</div></div>
+            <div class="input-row"><input id="chatInput" placeholder="输入问题..." onkeypress="if(event.key=='Enter')sendChat()"><button onclick="sendChat()">发送</button></div>
         </div>
         
         <div id="image" class="tab-content">
             <h3 style="margin-bottom:15px">🎨 DALL-E AI 画图</h3>
             <div class="input-row">
-                <input id="imgPrompt" value="一只可爱的猫咪在太空，赛博朋克风格">
+                <input id="imgPrompt" value="一只可爱的猫咪">
                 <select id="imgSize" style="flex:none;width:140px">
-                    <option value="1024x1024">1024×1024</option>
                     <option value="512x512">512×512</option>
+                    <option value="1024x1024">1024×1024</option>
                 </select>
                 <button onclick="genImage()">生成图片</button>
             </div>
@@ -94,14 +91,16 @@ FRONTEND = """
         async function genImage(){
             const p=document.getElementById('imgPrompt').value;
             const s=document.getElementById('imgSize').value;
-            document.getElementById('imgResult').innerHTML='<div class="loading">🖌️ 正在生成图片，请稍候...</div>';
+            document.getElementById('imgResult').innerHTML='<div class="loading">🖌️ 正在生成图片...</div>';
             const r=await fetch('/api/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p,size:s})});
             const d=await r.json();
-            console.log(d);
+            console.log('返回数据:', d);
             if(d.url){
                 document.getElementById('imgResult').innerHTML='<div class="image-grid"><div class="card"><img src="'+d.url+'"></div></div>';
+            }else if(d.data && d.data[0]){
+                document.getElementById('imgResult').innerHTML='<div class="image-grid"><div class="card"><img src="'+d.data[0].url+'"></div></div>';
             }else{
-                document.getElementById('imgResult').innerHTML='<p style="color:red;margin-top:15px">生成失败：'+JSON.stringify(d)+'</p>';
+                document.getElementById('imgResult').innerHTML='<p style="color:red;padding:20px">生成失败<br>'+JSON.stringify(d)+'</p>';
             }
         }
     </script>
@@ -129,22 +128,13 @@ def api_image():
     data = request.json
     response = requests.post(
         f'{OPENAI_BASE_URL}/images/generations',
-        headers={
-            'Authorization': f'Bearer {OPENAI_API_KEY}',
-            'Content-Type': 'application/json'
-        },
-        json={
-            "model": "dall-e-3",
-            "prompt": data['prompt'],
-            "n": 1,
-            "size": data['size']
-        },
-        timeout=120
+        headers={'Authorization': f'Bearer {OPENAI_API_KEY}'},
+        json={'model': 'dall-e-3', 'prompt': data['prompt'], 'n': 1, 'size': data['size']}
     )
     result = response.json()
-    if 'data' in result and len(result['data']) > 0:
+    if 'data' in result and result['data']:
         return {'url': result['data'][0]['url']}
-    return {'error': str(result)}
+    return result
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
