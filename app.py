@@ -1,4 +1,4 @@
-from flask import Flask, request, Response
+from flask import Flask, request, Response, render_template_string
 import requests
 import os
 
@@ -9,72 +9,142 @@ OPENAI_API_KEY = "fk244398-QSw83MwkSHVOg8Sn1wyZBWHmBMA5EjMx"
 OPENAI_BASE_URL = "https://openai.api2d.net/v1"
 # ======================================
 
-@app.route('/')
-def home():
-    return """
+FRONTEND = """
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width">
-    <title>AI 助手</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 全能助手</title>
     <style>
-        body{font-family:Arial;max-width:800px;margin:0 auto;padding:20px;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh}
-        .box{background:white;border-radius:15px;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,0.2)}
-        h1{text-align:center;color:#667eea}
-        #chat{height:400px;overflow-y:auto;padding:15px;background:#f8f9fa;border-radius:10px;margin-bottom:15px}
-        .msg{margin-bottom:12px;padding:10px 14px;border-radius:15px;max-width:80%}
-        .user{background:#667eea;color:white;margin-left:auto}
-        .ai{background:#e9ecef;margin-right:auto}
-        .row{display:flex;gap:10px}
-        input{flex:1;padding:12px 18px;border:2px solid #e5e5e5;border-radius:25px;outline:none}
-        button{padding:12px 25px;background:#667eea;color:white;border:none;border-radius:25px;cursor:pointer}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:20px}
+        .container{max-width:900px;margin:0 auto;background:white;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+        .header{background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:25px;text-align:center}
+        .tabs{display:flex;background:#f5f5f5}
+        .tab{flex:1;padding:15px;text-align:center;cursor:pointer;border:none;background:none;font-size:16px;font-weight:600;color:#666;transition:all 0.3s}
+        .tab.active{background:white;color:#667eea;border-bottom:3px solid #667eea}
+        .tab-content{display:none;padding:25px}
+        .tab-content.active{display:block}
+        .chat-box{height:450px;overflow-y:auto;padding:20px;background:#f8f9fa;border-radius:10px;margin-bottom:20px}
+        .msg{margin-bottom:15px;padding:12px 16px;border-radius:18px;max-width:80%;line-height:1.6}
+        .msg.user{background:linear-gradient(135deg,#667eea,#764ba2);color:white;margin-left:auto}
+        .msg.ai{background:white;margin-right:auto;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+        .msg img{max-width:100%;border-radius:10px;margin-top:10px}
+        .input-row{display:flex;gap:10px}
+        input,select{flex:1;padding:12px 20px;border:2px solid #e5e5e5;border-radius:25px;font-size:15px;outline:none}
+        button{padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:25px;font-size:15px;font-weight:600;cursor:pointer}
+        button:hover{transform:translateY(-2px)}
+        .image-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px;margin-top:20px}
+        .image-card{border-radius:10px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.1)}
+        .image-card img{width:100%;display:block}
+        .loading{text-align:center;padding:40px;color:#666}
+        .tip{background:#fff3cd;padding:15px;border-radius:10px;margin:15px 0}
     </style>
 </head>
 <body>
-    <div class="box">
-        <h1>🤖 AI 智能助手</h1>
-        <div id="chat"><div class="msg ai">你好！有什么可以帮助你的？</div></div>
-        <div class="row">
-            <input id="input" placeholder="输入问题..." onkeypress="if(event.key=='Enter')send()">
-            <button onclick="send()">发送</button>
+    <div class="container">
+        <div class="header"><h1>🚀 AI 全能助手</h1><p style="opacity:0.9;margin-top:5px">聊天对话 | AI画图 | 视频生成</p></div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="tab('chat')">💬 聊天</button>
+            <button class="tab" onclick="tab('image')">🎨 画图</button>
+            <button class="tab" onclick="tab('video')">🎬 视频</button>
+        </div>
+        
+        <div id="chat" class="tab-content active">
+            <div class="chat-box" id="chatBox"><div class="msg ai">你好！我是AI助手，有什么可以帮助你的？</div></div>
+            <div class="input-row"><input id="chatInput" placeholder="输入你的问题..." onkeypress="if(event.key=='Enter')sendChat()"><button onclick="sendChat()">发送</button></div>
+        </div>
+        
+        <div id="image" class="tab-content">
+            <h3 style="margin-bottom:15px">🎨 DALL-E AI 画图</h3>
+            <div class="input-row" style="margin-bottom:15px">
+                <input id="imgPrompt" value="一只可爱的猫咪在太空，赛博朋克风格">
+                <select id="imgSize" style="flex:none;width:140px">
+                    <option value="1024x1024">1024×1024</option>
+                    <option value="512x512">512×512</option>
+                </select>
+                <button onclick="genImage()">生成图片</button>
+            </div>
+            <div id="imgResult"></div>
+        </div>
+        
+        <div id="video" class="tab-content">
+            <h3 style="margin-bottom:15px">🎬 AI 视频生成</h3>
+            <div class="tip"><strong>💡 说明：</strong>视频生成需要 Runway/Pika API，配置对应密钥后即可使用。当前演示版。</div>
+            <div class="input-row">
+                <input id="videoPrompt" value="一只小狗在草地上奔跑">
+                <button onclick="genVideo()">生成视频</button>
+            </div>
+            <div id="videoResult" style="margin-top:20px"></div>
         </div>
     </div>
     <script>
-        async function send(){
-            const v = document.getElementById('input').value.trim();
-            if(!v) return;
-            document.getElementById('chat').innerHTML += '<div class="msg user">'+v+'</div>';
-            document.getElementById('input').value='';
-            document.getElementById('chat').innerHTML += '<div class="msg ai">思考中...</div>';
-            const r = await fetch('/chat',{
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({msg:v})
-            });
-            const data = await r.json();
-            document.getElementById('chat').lastChild.remove();
-            document.getElementById('chat').innerHTML += '<div class="msg ai">'+data.reply+'</div>';
-            document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+        function tab(t){
+            document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(x=>x.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(t).classList.add('active');
+        }
+        async function sendChat(){
+            const v=document.getElementById('chatInput').value.trim();
+            if(!v)return;
+            document.getElementById('chatBox').innerHTML+='<div class="msg user">'+v+'</div>';
+            document.getElementById('chatInput').value='';
+            document.getElementById('chatBox').innerHTML+='<div class="msg ai">思考中...</div>';
+            document.getElementById('chatBox').scrollTop=99999;
+            const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({msg:v})});
+            const d=await r.json();
+            document.getElementById('chatBox').lastChild.remove();
+            document.getElementById('chatBox').innerHTML+='<div class="msg ai">'+d.reply+'</div>';
+            document.getElementById('chatBox').scrollTop=99999;
+        }
+        async function genImage(){
+            const p=document.getElementById('imgPrompt').value;
+            const s=document.getElementById('imgSize').value;
+            document.getElementById('imgResult').innerHTML='<div class="loading">🖌️ 正在生成图片，请稍候...</div>';
+            const r=await fetch('/api/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p,size:s})});
+            const d=await r.json();
+            if(d.url){
+                document.getElementById('imgResult').innerHTML='<div class="image-grid"><div class="image-card"><img src="'+d.url+'"></div></div>';
+            }else{
+                document.getElementById('imgResult').innerHTML='<p style="color:red">生成失败</p>';
+            }
+        }
+        function genVideo(){
+            document.getElementById('videoResult').innerHTML='<div class="loading">🎬 视频生成功能需要配置 Runway/Pika API</div>';
         }
     </script>
 </body>
 </html>
-    """
+"""
 
-@app.route('/chat', methods=['POST'])
-def chat():
+@app.route('/')
+def index():
+    return render_template_string(FRONTEND)
+
+@app.route('/api/chat', methods=['POST'])
+def api_chat():
     data = request.json
     response = requests.post(
         f'{OPENAI_BASE_URL}/chat/completions',
-        json={
-            'model': 'gpt-3.5-turbo',
-            'messages': [{'role': 'user', 'content': data['msg']}]
-        },
+        json={'model': 'gpt-3.5-turbo', 'messages': [{'role': 'user', 'content': data['msg']}]},
         headers={'Authorization': f'Bearer {OPENAI_API_KEY}'}
     )
     result = response.json()
     return {'reply': result['choices'][0]['message']['content']}
+
+@app.route('/api/image', methods=['POST'])
+def api_image():
+    data = request.json
+    response = requests.post(
+        f'{OPENAI_BASE_URL}/images/generations',
+        json={'model': 'dall-e-3', 'prompt': data['prompt'], 'n': 1, 'size': data['size']},
+        headers={'Authorization': f'Bearer {OPENAI_API_KEY}'}
+    )
+    result = response.json()
+    return {'url': result['data'][0]['url']}
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
