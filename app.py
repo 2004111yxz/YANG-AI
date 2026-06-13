@@ -6,8 +6,8 @@ import re
 app = Flask(__name__)
 
 # ======================================
-OPENAI_API_KEY = "fk244398-QSw83MwkSHVOg8Sn1wyZBWHmBMA5EjMx"
-OPENAI_BASE_URL = "https://openai.api2d.net/v1"
+OPENAI_API_KEY = "sk-2ca41d7ff3be4df28e63e6d192962b35"
+OPENAI_BASE_URL = "https://https://zhong-zhuan-zhen.onrender.com/v1"
 # Stable Diffusion API 配置
 SD_API_KEY = "你的SD密钥"  # 可以用 Stability AI 或其他SD API
 # ======================================
